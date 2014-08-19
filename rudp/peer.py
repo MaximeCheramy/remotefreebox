@@ -1,5 +1,6 @@
 from . import address
 from . import packet
+from event_loop import event_source
 import time
 from struct import pack, unpack
 from random import randint
@@ -7,6 +8,7 @@ from random import randint
 
 ACTION_TIMEOUT = 5000
 DROP_TIMEOUT = ACTION_TIMEOUT * 2
+MAX_RTO = 3000
 
 
 def rudp_timestamp():
@@ -22,12 +24,13 @@ class peer_handler(object):
 
 class peer(object):
     def __init__(self, rudp, addr, handler, endpoint):
-        self.rudp = rudp
         self.sendq = []
-        self.handler = handler
-        self.endpoint = endpoint
         self.address = address.address()
         self.address.set(addr)
+        self.endpoint = endpoint
+        self.rudp = rudp
+        self.handler = handler
+        self.service_source = event_source(self.service)
         self.scheduled = False
         self.reset()
         self.service_schedule()
@@ -35,7 +38,7 @@ class peer(object):
     def reset(self):
         print("reset peer")
         if self.scheduled:
-            self.rudp.evtloop.remove(self.service)
+            self.rudp.evtloop.remove(self.service_source)
         self.sendq = []
         self.scheduled = False
         self.abs_timeout_deadline = rudp_timestamp() + DROP_TIMEOUT
@@ -45,9 +48,12 @@ class peer(object):
         self.out_seq_unreliable = 0
         self.out_seq_acked = self.out_seq_reliable - 1
         self.state = 'new'
+        self.last_out_time = rudp_timestamp()
+        self.srtt = 100
+        self.rttvar = self.srtt // 2
+        self.rto = MAX_RTO
         self.must_ack = 0
         self.sendto_err = 0
-        self.last_out_time = rudp_timestamp()
 
     def analyse_reliable(self, reliable_seq):
         print("analyse reliable")
@@ -78,7 +84,7 @@ class peer(object):
         return 'sequenced'
 
     def handle_ack(self, ack):
-        print("handle ack")
+        print("handle ack", ack)
         ack_delta = ack - self.out_seq_acked
         adv_delta = ack - self.out_seq_reliable
 
@@ -125,9 +131,16 @@ class peer(object):
 
     def handle_pong(self, pc):
         print("peer handle pong")
-        orig = unpack('!Q', pc.data)
+        orig = unpack('!Q', pc.data)[0]
         delta = rudp_timestamp() - orig
         self.update_rtt(delta)
+
+    def update_rtt(self, last_rtt):
+        self.rttvar = (3 * self.rttvar + abs(self.srtt - last_rtt)) // 4
+        self.srtt = (7 * self.srtt + last_rtt) // 8
+        self.rto = self.srtt
+        if self.rto > MAX_RTO:
+            self.rto = MAX_RTO
 
     def incoming_packet(self, pc):
         print("peer incoming packet", self.state)
@@ -139,6 +152,8 @@ class peer(object):
             state = self.analyse_reliable(header.reliable)
         else:
             state = self.analyse_unreliable(header.reliable, header.unreliable)
+
+        print("state:", state)
 
         if state == 'unsequenced':
             if (self.state == 'connecting' and
@@ -197,6 +212,7 @@ class peer(object):
         return self.sendto_err
 
     def post_ack(self):
+        print("post ack")
         self.must_ack = 1
         if self.sendq:
             return
@@ -225,7 +241,8 @@ class peer(object):
         if delta <= 0:
             delta = 1
 
-        self.rudp.evtloop.add(rudp_timestamp() + delta, self.service)
+        self.service_source.when = rudp_timestamp() + delta
+        self.rudp.evtloop.add(self.service_source)
         self.scheduled = True
         print("end service schedule")
 
@@ -238,13 +255,18 @@ class peer(object):
 
     def send_queue(self):
         while self.sendq:
-            pc = self.sendq.pop(0)
+            pc = self.sendq[0]
             header = pc.header
             if self.must_ack:
                 header.opt |= packet.RUDP_OPT_ACK
                 header.reliable_ack = self.in_seq_reliable
 
             self.send_raw(pc)
+
+            if header.opt & packet.RUDP_OPT_RELIABLE and False:
+                header.opt |= packet.RUDP_OPT_RETRANSMITTED
+            else:
+                self.sendq.pop(0)
 
     def send_raw(self, packet):
         print("send raw")
@@ -256,7 +278,7 @@ class peer(object):
         self.scheduled = False
 
         if self.abs_timeout_deadline < rudp_timestamp():
-            print("Dropped because abs timeout deadline < now")
+            print(rudp_timestamp(), "Dropped because abs timeout deadline < now")
             self.handler.dropped(self)
             return
 

@@ -1,6 +1,18 @@
-import bisect
 import time
 import select
+
+
+class event_source(object):
+    def __init__(self, callback, args=None):
+        self.when = None
+        self.callback = callback
+        self.args = args
+
+    def call(self):
+        if self.args is not None:
+            self.callback(*self.args)
+        else:
+            self.callback()
 
 
 class event_loop(object):
@@ -8,11 +20,12 @@ class event_loop(object):
         self.events = []
         self.objects = {}
 
-    def add(self, when, callback, args=None):
-        bisect.insort_right(self.events, (when, callback, args))
+    def add(self, event):
+        if event not in self.events:
+            self.events.append(event)
 
-    def remove(self, callback):
-        self.events[:] = [x for x in self.events if x[1] is not callback]
+    def remove(self, event):
+        self.events[:] = [x for x in self.events if x is not event]
 
     def add_object(self, obj, callback, args=None):
         self.objects[obj] = (callback, args)
@@ -26,11 +39,14 @@ class event_loop(object):
                     callback()
                 else:
                     callback(*args)
-            if self.events and self.events[-1][0] <= time.time() * 1000:
-                evt = self.events.pop()
-                if evt[2] is None:
-                    evt[1]()
-                else:
-                    evt[1](*evt[2])
+
+            toremove = []
+            for evt in self.events:
+                if evt.when <= time.time() * 1000:
+                    evt.call()
+                    toremove.append(evt)
+            if toremove:
+                self.events[:] = [evt for evt in self.events
+                                  if evt not in toremove]
             else:
                 time.sleep(.001)

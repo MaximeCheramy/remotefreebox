@@ -29,14 +29,10 @@ class client(object):
 
     def handle_endpoint_packet(self, addr, pc):
         print("Endpoint handling packet", addr, pc)
-        try:
-            self.peer.incoming_packet(pc)
-            if not self.connected:
-                self.connected = True
-                self.handler.connected(self)
-        except Exception as e:
-            print(e)
-            print("ignore packet.")
+        self.peer.incoming_packet(pc)
+        if not self.connected:
+            self.connected = True
+            self.handler.connected(self)
 
     def peer_dropped(self, peer):
         print("client peer dropped")
