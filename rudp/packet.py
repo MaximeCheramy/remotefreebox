@@ -31,7 +31,7 @@ class packet_header(object):
 class packet_conn_req(object):
     def __init__(self, header=None):
         if header is None:
-            self.header = packet_header()
+            self.header = packet_header(cmd=RUDP_CMD_CONN_REQ)
         else:
             self.header = header
         self.data = 0
@@ -43,7 +43,7 @@ class packet_conn_req(object):
 class packet_conn_rsp(object):
     def __init__(self, header=None):
         if header is None:
-            self.header = packet_header()
+            self.header = packet_header(cmd=RUDP_CMD_CONN_RSP)
         else:
             self.header = header
         self.data = 0

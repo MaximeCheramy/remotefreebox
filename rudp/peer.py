@@ -1,6 +1,7 @@
 from . import address
 from . import packet
 import time
+from struct import pack
 from random import randint
 
 
@@ -29,7 +30,7 @@ class peer(object):
         self.address.set(addr)
         self.scheduled = False
         self.reset()
-        #self.service_schedule()
+        self.service_schedule()
 
     def reset(self):
         print("reset peer")
@@ -96,11 +97,10 @@ class peer(object):
 
         if header.opt & packet.RUDP_OPT_RELIABLE:
             self.post_ack()
-        #self.service_schedule()
+        self.service_schedule()
 
     def send_connect(self):
         pc = packet.packet_conn_req()
-        pc.header.command = packet.RUDP_CMD_CONN_REQ
         self.state = 'connecting'
         return self.send_reliable(pc)
 
@@ -124,6 +124,7 @@ class peer(object):
             head = self.sendq[0]
             header = head.header
             if header.opt & packet.RUDP_OPT_RETRANSMITTED:
+                print("already transmitted head, wait for rto")
                 # already transmitted head, wait for rto
                 delta = rudp_timestamp() - self.last_out_time + self.rto
             else:
@@ -139,10 +140,14 @@ class peer(object):
 
         self.rudp.evtloop.add(rudp_timestamp() + delta, self.service)
         self.scheduled = True
-        print("fin service schedule")
+        print("end service schedule")
 
     def ping(self):
         print("ping")
+        pc = packet.packet_data()
+        pc.header.command = packet.RUDP_CMD_PING
+        pc.data = pack('!Q', rudp_timestamp())
+        self.send_reliable(pc)
 
     def send_queue(self):
         while self.sendq:
