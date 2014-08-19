@@ -11,6 +11,9 @@ class event_loop(object):
     def add(self, when, callback, args=None):
         bisect.insort_right(self.events, (when, callback, args))
 
+    def remove(self, callback):
+        self.events[:] = [x for x in self.events if x[1] is not callback]
+
     def add_object(self, obj, callback, args=None):
         self.objects[obj] = (callback, args)
 

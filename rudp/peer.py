@@ -34,8 +34,10 @@ class peer(object):
 
     def reset(self):
         print("reset peer")
+        if self.scheduled:
+            self.rudp.evtloop.remove(self.service)
         self.sendq = []
-        self.scheduled = 0
+        self.scheduled = False
         self.abs_timeout_deadline = rudp_timestamp() + DROP_TIMEOUT
         self.in_seq_reliable = 0xffff
         self.in_seq_unreliable = 0
@@ -48,10 +50,32 @@ class peer(object):
         self.last_out_time = rudp_timestamp()
 
     def analyse_reliable(self, reliable_seq):
-        pass
+        print("analyse reliable")
+        if self.in_seq_reliable == reliable_seq:
+            return 'retransmitted'
+
+        if (self.in_seq_reliable + 1) % (2 ** 16) != reliable_seq:
+            print("unsequenced!", self.in_seq_reliable + 1, reliable_seq)
+            return 'unsequenced'
+
+        self.in_seq_reliable = reliable_seq
+        self.in_seq_unreliable = 0
+
+        print("sequenced")
+        return 'sequenced'
 
     def analyse_unreliable(self, reliable_seq, unreliable_seq):
-        pass
+        if self.in_seq_reliable != reliable_seq:
+            return 'unsequenced'
+
+        unreliable_delta = unreliable_seq - self.in_seq_unreliable
+
+        if unreliable_delta <= 0:
+            return 'unsequenced'
+
+        self.in_seq_unreliable = unreliable_seq
+
+        return 'sequenced'
 
     def handle_ack(self, reliable_ack):
         pass
@@ -59,7 +83,22 @@ class peer(object):
     def handle_packet(self):
         pass
 
+    def handle_ping(self, pc):
+        if pc.header.opt & packet.RUDP_OPT_RETRANSMITTED:
+            return
+
+        out = packet.packet_data(data=pc.data)
+        header = out.header
+        header.command = packet.RUDP_CMD_PONG
+        header.opt = 0
+
+        self.send_unreliable(out)
+
+    def handle_pong(self):
+        pass
+
     def incoming_packet(self, pc):
+        print("peer incoming packet", self.state)
         header = pc.header
         if header.opt & packet.RUDP_OPT_ACK:
             self.handle_ack(header.reliable_ack)
@@ -72,6 +111,7 @@ class peer(object):
         if state == 'unsequenced':
             if (self.state == 'connecting' and
                     header.command == packet.RUDP_CMD_CONN_RSP):
+                print("run.")
                 self.in_seq_reliable = header.reliable
                 self.handle_ack(header.reliable_ack)
                 self.state = 'run'
@@ -80,6 +120,7 @@ class peer(object):
         elif state == 'sequenced':
             self.abs_timeout_deadline = rudp_timestamp() + DROP_TIMEOUT
             if header.command == packet.RUDP_CMD_CLOSE:
+                print("peer dead (CMD CLOSE)")
                 self.state = 'dead'
                 self.handler.dropped(self)
             elif header.command == packet.RUDP_CMD_PING:
@@ -110,6 +151,15 @@ class peer(object):
         pc.header.reliable = self.out_seq_reliable
         pc.header.unreliable = 0
         self.out_seq_unreliable = 0
+        self.sendq.append(pc)
+        self.service_schedule()
+        return self.sendto_err
+
+    def send_unreliable(self, pc):
+        pc.header.opt = 0
+        self.out_seq_unreliable += 1
+        pc.header.reliable = self.out_seq_reliable
+        pc.header.unreliable = self.out_seq_unreliable
         self.sendq.append(pc)
         self.service_schedule()
         return self.sendto_err
@@ -169,6 +219,7 @@ class peer(object):
         self.scheduled = False
 
         if self.abs_timeout_deadline < rudp_timestamp():
+            print("Dropped because abs timeout deadline < now")
             self.handler.dropped(self)
             return
 
