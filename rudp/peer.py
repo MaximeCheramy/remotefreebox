@@ -1,7 +1,7 @@
 from . import address
 from . import packet
 import time
-from struct import pack
+from struct import pack, unpack
 from random import randint
 
 
@@ -77,13 +77,42 @@ class peer(object):
 
         return 'sequenced'
 
-    def handle_ack(self, reliable_ack):
-        pass
+    def handle_ack(self, ack):
+        print("handle ack")
+        ack_delta = ack - self.out_seq_acked
+        adv_delta = ack - self.out_seq_reliable
+
+        if ack_delta < 0:
+            print("ack in past")
+            return 0
+
+        if adv_delta > 0:
+            print("packet acking an unset seq no -- broken packet")
+            return 1
+
+        self.out_seq_acked = ack
+        toremove = []
+        for pc in self.sendq:
+            header = pc.header
+            seqno = header.reliable
+            delta = seqno - ack
+
+            if (not (header.opt & packet.RUDP_OPT_RELIABLE)
+                    or not (header.opt & packet.RUDP_OPT_RETRANSMITTED)):
+                break
+
+            if delta > 0:
+                break
+
+            toremove.append(pc)
+
+        self.sendq[:] = [x for x in self.sendq if x not in toremove]
 
     def handle_packet(self):
-        pass
+        print("handle_packet TODO")
 
     def handle_ping(self, pc):
+        print("peer handle ping")
         if pc.header.opt & packet.RUDP_OPT_RETRANSMITTED:
             return
 
@@ -94,8 +123,11 @@ class peer(object):
 
         self.send_unreliable(out)
 
-    def handle_pong(self):
-        pass
+    def handle_pong(self, pc):
+        print("peer handle pong")
+        orig = unpack('!Q', pc.data)
+        delta = rudp_timestamp() - orig
+        self.update_rtt(delta)
 
     def incoming_packet(self, pc):
         print("peer incoming packet", self.state)
@@ -165,7 +197,12 @@ class peer(object):
         return self.sendto_err
 
     def post_ack(self):
-        pass
+        self.must_ack = 1
+        if self.sendq:
+            return
+        pc = packet.packet_data()
+        self.send_unreliable(pc)
+        self.service_schedule()
 
     def service_schedule(self):
         delta = ACTION_TIMEOUT
@@ -201,13 +238,13 @@ class peer(object):
 
     def send_queue(self):
         while self.sendq:
-            packet = self.sendq.pop()
-            header = packet.header
+            pc = self.sendq.pop(0)
+            header = pc.header
             if self.must_ack:
                 header.opt |= packet.RUDP_OPT_ACK
                 header.reliable_ack = self.in_seq_reliable
 
-            self.send_raw(packet)
+            self.send_raw(pc)
 
     def send_raw(self, packet):
         print("send raw")
