@@ -9,7 +9,7 @@ class event_loop(object):
         self.objects = {}
 
     def add(self, when, callback, args=None):
-        bisect.insort(self.events, (when, callback, args))
+        bisect.insort_right(self.events, (when, callback, args))
 
     def add_object(self, obj, callback, args=None):
         self.objects[obj] = (callback, args)
@@ -23,7 +23,7 @@ class event_loop(object):
                     callback()
                 else:
                     callback(*args)
-            if self.events and self.events[0][0] <= time.time() * 1000:
+            if self.events and self.events[-1][0] <= time.time() * 1000:
                 evt = self.events.pop()
                 if evt[2] is None:
                     evt[1]()
