@@ -60,14 +60,18 @@ class client(object):
     def set_addr(self, addr):
         self.address.set(addr)
 
-    def send(self, reliable, command, data, size):
-        print("client send", reliable, command, data, size)
+    def send(self, reliable, command, data):
+        print("client send", reliable, command, data)
         if command + packet.RUDP_CMD_APP > 255:
             return None
         if not self.connected:
             return None
 
+        pc = packet.packet_data()
+        pc.header.command = packet.RUDP_CMD_APP + command
+        pc.data = data
+
         if reliable:
-            return None
+            self.peer.send_reliable(pc)
         else:
-            return None
+            self.peer.send_unreliable(pc)
