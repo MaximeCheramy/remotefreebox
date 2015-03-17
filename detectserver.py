@@ -15,18 +15,19 @@ class Server(object):
 
 
 class MyListener(object):
-    def addService(self, zeroconf, type, name):
-        info = zeroconf.getServiceInfo(type, name)
+    # def addService(self, zeroconf, type, name):
+    def add_service(self, zeroconf, type, name):
+        info = zeroconf.get_service_info(type, name)
         if info:
-            servers.append(Server(socket.inet_ntoa(info.getAddress()),
-                                  info.getPort(), info.getServer()))
+            servers.append(Server(socket.inet_ntoa(info.address),
+                                  info.port, info.server))
 
 
 def detect():
     zeroconf = Zeroconf()
     print("Browsing services...")
     listener = MyListener()
-    ServiceBrowser(zeroconf, "_hid._udp.local.", listener)
+    ServiceBrowser(zeroconf, "_hid._udp.local.", listener=listener)
     freebox = None
     while not freebox:
         for server in servers:
