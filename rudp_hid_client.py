@@ -1,5 +1,6 @@
 from struct import pack, unpack
 from rudp.client import client, client_handler
+from rudp.packet import RUDP_CMD_APP
 from log import warning, info
 from time import sleep
 
@@ -105,7 +106,7 @@ class rudp_hid_client(object):
         self.base.send(1, FOILS_HID_DEVICE_NEW, packet)
 
     def handle_packet(self, cl, cmd, data):
-        command = cmd - 0x10  # user packet, update command
+        command = cmd - RUDP_CMD_APP  # user packet, update command
         _, report_id = unpack("!II", data)
         if command == FOILS_HID_DEVICE_OPEN:
             self.state = "open"
@@ -133,17 +134,19 @@ class rudp_hid_client(object):
         self.base.send(reliable, FOILS_HID_FEATURE, header)
 
     # size of code is number of bits of the code (8, 16, 32)
-    def send_command(self, report, code, size_of_code):
-        self.header = foils_hid_header(0, report)
+    def send_command(self, report, code, size_of_code=32):
+        header = foils_hid_header(0, report)
         pack_format = '!I'
         if size_of_code == 16:
             pack_format = '<H'
         elif size_of_code == 8:
             pack_format = '!B'
 
-        data = self.header.raw() + pack(pack_format, code)
+        data = header.raw() + pack(pack_format, code)
         self.base.send(1, FOILS_HID_DATA, data)
 
+        sleep(0.01)
+
         # send empty command too
-        data = self.header.raw() + pack(pack_format, 0)
+        data = header.raw() + pack(pack_format, 0)
         self.base.send(1, FOILS_HID_DATA, data)
