@@ -25,7 +25,6 @@ class MyListener(object):
 
 def detect():
     zeroconf = Zeroconf()
-    print("Browsing services...")
     listener = MyListener()
     ServiceBrowser(zeroconf, "_hid._udp.local.", listener=listener)
     freebox = None

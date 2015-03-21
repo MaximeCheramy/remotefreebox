@@ -34,9 +34,9 @@ class peer(object):
         self.scheduled = False
         self.reset()
         self.service_schedule()
+        self.state = "none"
 
     def reset(self):
-        print("reset peer")
         if self.scheduled:
             self.rudp.evtloop.remove(self.service_source)
         self.sendq = []
@@ -56,7 +56,6 @@ class peer(object):
         self.sendto_err = 0
 
     def analyse_reliable(self, reliable_seq):
-        print("analyse reliable")
         if self.in_seq_reliable == reliable_seq:
             return 'retransmitted'
 
@@ -114,9 +113,6 @@ class peer(object):
 
         self.sendq[:] = [x for x in self.sendq if x not in toremove]
 
-    def handle_packet(self):
-        print("handle_packet TODO")
-
     def handle_ping(self, pc):
         print("peer handle ping")
         if pc.header.opt & packet.RUDP_OPT_RETRANSMITTED:
@@ -143,7 +139,7 @@ class peer(object):
             self.rto = MAX_RTO
 
     def incoming_packet(self, pc):
-        print("peer incoming packet", self.state)
+        print("peer incoming packet (state=%s, pkt=%s)" % (self.state, packet.command_to_string(pc.header.command)))
         header = pc.header
         if header.opt & packet.RUDP_OPT_ACK:
             self.handle_ack(header.reliable_ack)
@@ -160,8 +156,7 @@ class peer(object):
                     header.command == packet.RUDP_CMD_CONN_RSP):
                 print("run.")
                 self.in_seq_reliable = header.reliable
-                self.handle_ack(header.reliable_ack)
-                self.state = 'run'
+                self.state = 'connected'
         elif state == 'retransmitted':
             self.abs_timeout_deadline = rudp_timestamp() + DROP_TIMEOUT
         elif state == 'sequenced':
@@ -181,7 +176,8 @@ class peer(object):
                 else:
                     print("pong while not running")
             elif header.command >= packet.RUDP_CMD_APP:
-                self.handler.handle_packet(pc)
+                # user command, transmit the packet
+                self.handler.handle_packet(self, pc)
 
         if header.opt & packet.RUDP_OPT_RELIABLE:
             self.post_ack()
@@ -244,7 +240,6 @@ class peer(object):
         self.service_source.when = rudp_timestamp() + delta
         self.rudp.evtloop.add(self.service_source)
         self.scheduled = True
-        print("end service schedule")
 
     def ping(self):
         print("ping")
@@ -260,6 +255,7 @@ class peer(object):
             if self.must_ack:
                 header.opt |= packet.RUDP_OPT_ACK
                 header.reliable_ack = self.in_seq_reliable
+            print("==> Sending %s" % packet.command_to_string(header.command))
 
             self.send_raw(pc)
 
@@ -269,12 +265,10 @@ class peer(object):
                 self.sendq.pop(0)
 
     def send_raw(self, packet):
-        print("send raw")
         self.last_out_time = rudp_timestamp()
         self.endpoint.send(self.address.get(), packet.raw())
 
     def service(self):
-        print("service")
         self.scheduled = False
 
         if self.abs_timeout_deadline < rudp_timestamp():

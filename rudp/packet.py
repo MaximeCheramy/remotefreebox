@@ -53,7 +53,7 @@ class packet_conn_rsp(object):
 
 
 class packet_data(object):
-    def __init__(self, header=None, data=''):
+    def __init__(self, header=None, data=bytes()):
         if header is None:
             self.header = packet_header()
         else:
@@ -65,7 +65,6 @@ class packet_data(object):
 
 
 def data_to_packet(data):
-    print(data)
     cmd, opt, reliable_ack, reliable, unreliable = unpack('!BBHHH', data[:8])
     header = packet_header(cmd, opt, reliable_ack, reliable, unreliable)
     if header.command == RUDP_CMD_CONN_RSP:
@@ -74,3 +73,12 @@ def data_to_packet(data):
         return packet_conn_req(header)
     else:
         return packet_data(header, data[8:])
+
+def command_to_string(command):
+    d = { "RUDP_CMD_NOOP": 0, "RUDP_CMD_CLOSE": 1, "RUDP_CMD_CONN_REQ": 2,
+          "RUDP_CMD_CONN_RSP": 3, "RUDP_CMD_PING": 4, "RUDP_CMD_PONG": 5,
+          "RUDP_CMD_APP": 0x10 }
+    for cmd, v in d.items():
+        if v == command:
+            return cmd
+    return "<unknown>"

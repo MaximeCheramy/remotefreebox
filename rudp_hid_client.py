@@ -1,5 +1,7 @@
 from struct import pack
 from rudp.client import client, client_handler
+from log import warning, info
+from time import sleep
 
 
 FOILS_HID_DEVICE_NEW = 0
@@ -35,16 +37,25 @@ class foils_hid_header(object):
         self.report_id = report_id
 
     def raw(self):
-        return pack('!IB', self.device_id, self.report_id)
+        return pack('!II', self.device_id, self.report_id)
+
+
+class foils_hid_key():
+    def __init__(self, report_id=0, key=0):
+        self.header = foils_hid_header(0, report_id)
+        self.key = key
+
+    def raw(self):
+        return self.header.raw() + pack('!I', self.key)
 
 
 class foils_hid_device_new(object):
-    def __init__(self, name, serial, descriptor_offset, descriptor_size,
+    def __init__(self, name, serial, version, descriptor_offset, descriptor_size,
                  physical_offset, physical_size, strings_offset, strings_size):
         self.name = name
         self.serial = serial
         self.zero = 0
-        self.version = 1
+        self.version = version
         self.descriptor_offset = descriptor_offset
         self.descriptor_size = descriptor_size
         self.physical_offset = physical_offset
@@ -53,7 +64,6 @@ class foils_hid_device_new(object):
         self.strings_size = strings_size
 
     def raw(self):
-        print(type(self.name), type(self.serial))
         return pack('!64s32sHHHHHHHH', self.name, self.serial, self.zero,
                     self.version, self.descriptor_offset, self.descriptor_size,
                     self.physical_offset, self.physical_size,
@@ -61,19 +71,36 @@ class foils_hid_device_new(object):
 
 
 class rudp_hid_client(object):
-    def __init__(self, rudp, handler):
+    # create rudp client with proper address
+    # set handlers
+    def __init__(self, rudp, hid_handler, addr):
         self.rudp = rudp
-        self.handler = handler
-        self.base = client(rudp, handler)
+        self.handler = hid_handler
+        base_handler = client_handler(self.handle_packet,
+                                      self.handler.link_info,
+                                      self.handler.connected,
+                                      self.handler.server_lost)
+        self.base = client(rudp, base_handler)
+        self.base.set_addr(addr)
 
-    def device_new(self, desc, device_id):
+    def setup_device(self, desc):
+        info("setup_device")
+        self.base.connect()
+        info("connect called")
+        while not self.base.connected:
+            sleep(0.1)
+        info("connected, calling device_new")
+        self.device_new(desc)
+        info("device_new called")
+
+    def device_new(self, desc, device_id=0):
         header = foils_hid_header(device_id)
 
         descriptor_size = round_up(desc.descriptor_size)
         physical_size = round_up(desc.physical_size)
 
         dev = foils_hid_device_new(
-            desc.name, b'', 112, desc.descriptor_size,
+            desc.name, b'', desc.version, 112, desc.descriptor_size,
             112 + descriptor_size, desc.physical_size, 112 +
             descriptor_size + physical_size, desc.strings_size)
 
@@ -82,8 +109,11 @@ class rudp_hid_client(object):
                     desc.descriptor, desc.physical, desc.strings)
 
         packet = header.raw() + dev.raw() + data
-        print(packet)
         self.base.send(1, FOILS_HID_DEVICE_NEW, packet)
+
+    def handle_packet(self, cl, cmd, data):
+        warning("HANDLE PACKET")
+        self.handler.handle_packet(cl, cmd, data)
 
     def device_drop(self, device_id):
         header = foils_hid_header(device_id)
@@ -96,22 +126,3 @@ class rudp_hid_client(object):
     def input_report_send(self, device_id, report_id, reliable, data):
         header = pack('!IB{}s'.format(len(data)), device_id, report_id, data)
         self.base.send(reliable, FOILS_HID_FEATURE, header)
-
-
-def do_handle_packet(client, command, data):
-    print("TODO: do handle packet")
-
-
-def do_link_info(client):
-    print("TODO: do link info")
-
-
-def do_connected(client):
-    client.handler.connected(client)
-
-
-def do_server_lost(client):
-    print("TODO: do server lost")
-
-HANDLER = client_handler(
-    do_handle_packet, do_link_info, do_connected, do_server_lost)

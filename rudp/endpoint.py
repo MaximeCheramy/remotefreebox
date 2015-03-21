@@ -29,7 +29,6 @@ class endpoint(object):
         self.address.set(addr)
 
     def send(self, addr, data):
-        print("send", data, addr)
         self.socket.sendto(data, addr)
 
     def _handle_incoming(self):

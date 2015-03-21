@@ -38,8 +38,8 @@ class client(object):
         print("client peer dropped")
 
     def handle_data_packet(self, peer, pc):
-        self.handler
-        print("client handle data packet")
+        command = pc.header.command
+        self.handler.handle_packet(self, command, pc.data)
 
     def connect(self):
         addr = self.address.get()
@@ -61,7 +61,6 @@ class client(object):
         self.address.set(addr)
 
     def send(self, reliable, command, data):
-        print("client send", reliable, command, data)
         if command + packet.RUDP_CMD_APP > 255:
             return None
         if not self.connected:

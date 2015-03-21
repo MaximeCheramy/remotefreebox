@@ -14,6 +14,9 @@ class event_source(object):
         else:
             self.callback()
 
+    def __repr__(self):
+        return "event_source %s (callback=%s args=%s)" % (hex(id(self)), self.callback, self.args)
+
 
 class event_loop(object):
     def __init__(self):
