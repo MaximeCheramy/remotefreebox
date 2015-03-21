@@ -66,7 +66,6 @@ class peer(object):
         self.in_seq_reliable = reliable_seq
         self.in_seq_unreliable = 0
 
-        print("sequenced")
         return 'sequenced'
 
     def analyse_unreliable(self, reliable_seq, unreliable_seq):
@@ -83,7 +82,6 @@ class peer(object):
         return 'sequenced'
 
     def handle_ack(self, ack):
-        print("handle ack", ack)
         ack_delta = ack - self.out_seq_acked
         adv_delta = ack - self.out_seq_reliable
 
@@ -114,7 +112,6 @@ class peer(object):
         self.sendq[:] = [x for x in self.sendq if x not in toremove]
 
     def handle_ping(self, pc):
-        print("peer handle ping")
         if pc.header.opt & packet.RUDP_OPT_RETRANSMITTED:
             return
 
@@ -126,7 +123,6 @@ class peer(object):
         self.send_unreliable(out)
 
     def handle_pong(self, pc):
-        print("peer handle pong")
         orig = unpack('!Q', pc.data)[0]
         delta = rudp_timestamp() - orig
         self.update_rtt(delta)
@@ -139,7 +135,6 @@ class peer(object):
             self.rto = MAX_RTO
 
     def incoming_packet(self, pc):
-        print("peer incoming packet (state=%s, pkt=%s)" % (self.state, packet.command_to_string(pc.header.command)))
         header = pc.header
         if header.opt & packet.RUDP_OPT_ACK:
             self.handle_ack(header.reliable_ack)
@@ -148,8 +143,6 @@ class peer(object):
             state = self.analyse_reliable(header.reliable)
         else:
             state = self.analyse_unreliable(header.reliable, header.unreliable)
-
-        print("state:", state)
 
         if state == 'unsequenced':
             if (self.state == 'connecting' and
@@ -208,7 +201,6 @@ class peer(object):
         return self.sendto_err
 
     def post_ack(self):
-        print("post ack")
         self.must_ack = 1
         if self.sendq:
             return
@@ -255,7 +247,6 @@ class peer(object):
             if self.must_ack:
                 header.opt |= packet.RUDP_OPT_ACK
                 header.reliable_ack = self.in_seq_reliable
-            print("==> Sending %s" % packet.command_to_string(header.command))
 
             self.send_raw(pc)
 

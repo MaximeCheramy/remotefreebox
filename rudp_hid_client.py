@@ -1,4 +1,4 @@
-from struct import pack
+from struct import pack, unpack
 from rudp.client import client, client_handler
 from log import warning, info
 from time import sleep
@@ -6,7 +6,7 @@ from time import sleep
 
 FOILS_HID_DEVICE_NEW = 0
 FOILS_HID_DEVICE_DROPPED = 1
-FOILS_HID_DEVICE_CREATED = 2
+FOILS_HID_DEVICE_OPEN = 2
 FOILS_HID_DEVICE_CLOSE = 3
 FOILS_HID_FEATURE = 4
 FOILS_HID_DATA = 5
@@ -40,15 +40,6 @@ class foils_hid_header(object):
         return pack('!II', self.device_id, self.report_id)
 
 
-class foils_hid_key():
-    def __init__(self, report_id=0, key=0):
-        self.header = foils_hid_header(0, report_id)
-        self.key = key
-
-    def raw(self):
-        return self.header.raw() + pack('!I', self.key)
-
-
 class foils_hid_device_new(object):
     def __init__(self, name, serial, version, descriptor_offset, descriptor_size,
                  physical_offset, physical_size, strings_offset, strings_size):
@@ -74,6 +65,7 @@ class rudp_hid_client(object):
     # create rudp client with proper address
     # set handlers
     def __init__(self, rudp, hid_handler, addr):
+        self.state = "none"
         self.rudp = rudp
         self.handler = hid_handler
         base_handler = client_handler(self.handle_packet,
@@ -82,6 +74,7 @@ class rudp_hid_client(object):
                                       self.handler.server_lost)
         self.base = client(rudp, base_handler)
         self.base.set_addr(addr)
+        self.reports_listening = set()
 
     def setup_device(self, desc):
         info("setup_device")
@@ -112,8 +105,20 @@ class rudp_hid_client(object):
         self.base.send(1, FOILS_HID_DEVICE_NEW, packet)
 
     def handle_packet(self, cl, cmd, data):
-        warning("HANDLE PACKET")
-        self.handler.handle_packet(cl, cmd, data)
+        command = cmd - 0x10  # user packet, update command
+        _, report_id = unpack("!II", data)
+        if command == FOILS_HID_DEVICE_OPEN:
+            self.state = "open"
+        elif command == FOILS_HID_DEVICE_CLOSE:
+            self.state = "closed"
+        elif command == FOILS_HID_GRAB:
+            self.reports_listening.add(report_id)
+            info("(grab) list is now %s" % self.reports_listening)
+        elif command == FOILS_HID_RELEASE:
+            self.reports_listening.remove(report_id)
+            info("(rel) list is now %s" % self.reports_listening)
+        else:
+            self.handler.handle_packet(cl, cmd, data)
 
     def device_drop(self, device_id):
         header = foils_hid_header(device_id)
@@ -126,3 +131,19 @@ class rudp_hid_client(object):
     def input_report_send(self, device_id, report_id, reliable, data):
         header = pack('!IB{}s'.format(len(data)), device_id, report_id, data)
         self.base.send(reliable, FOILS_HID_FEATURE, header)
+
+    # size of code is number of bits of the code (8, 16, 32)
+    def send_command(self, report, code, size_of_code):
+        self.header = foils_hid_header(0, report)
+        pack_format = '!I'
+        if size_of_code == 16:
+            pack_format = '<H'
+        elif size_of_code == 8:
+            pack_format = '!B'
+
+        data = self.header.raw() + pack(pack_format, code)
+        self.base.send(1, FOILS_HID_DATA, data)
+
+        # send empty command too
+        data = self.header.raw() + pack(pack_format, 0)
+        self.base.send(1, FOILS_HID_DATA, data)

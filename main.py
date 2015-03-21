@@ -9,8 +9,8 @@ from rudp_hid_client import FOILS_HID_DATA
 import socket
 from threading import Lock, Thread
 from getch import getch
-from rudp_hid_client import foils_hid_header, foils_hid_key, rudp_hid_client
-from fbx_descriptor import fbx_foils_hid_device_descriptor
+from rudp_hid_client import foils_hid_header, rudp_hid_client
+from fbx_descriptor import fbx_foils_hid_device_descriptor, fbx_get_command
 from rudp.packet import RUDP_CMD_APP
 from log import success, log, info
 
@@ -58,6 +58,6 @@ while True:
     ch = getch()
     if ord(ch) == 27:
         break
-#    elif ch == 'z':
-#        foils_pkt = foils_hid_key(2, 0x66)
-#        c.send(1, FOILS_HID_DATA, foils_pkt.raw())
+    elif ch == '-':
+        info("Sending -")
+        c.send_command(*fbx_get_command("Vol-"))

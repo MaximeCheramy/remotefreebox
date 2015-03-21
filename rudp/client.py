@@ -28,7 +28,6 @@ class client(object):
         pass
 
     def handle_endpoint_packet(self, addr, pc):
-        print("Endpoint handling packet", addr, pc)
         self.peer.incoming_packet(pc)
         if not self.connected:
             self.connected = True

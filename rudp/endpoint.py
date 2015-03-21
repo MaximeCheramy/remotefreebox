@@ -32,7 +32,6 @@ class endpoint(object):
         self.socket.sendto(data, addr)
 
     def _handle_incoming(self):
-        print("handle incoming")
         data, addr = self.socket.recvfrom(4096)
         pc = packet.data_to_packet(data)
         self.handler.handle_packet(addr, pc)
