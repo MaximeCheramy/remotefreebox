@@ -1,6 +1,6 @@
 from . import address
 from . import packet
-from event_loop import event_source
+from ..event_loop import event_source
 import time
 from struct import pack, unpack
 from random import randint
@@ -161,13 +161,9 @@ class peer(object):
             elif header.command == packet.RUDP_CMD_PING:
                 if self.state == 'run':
                     self.handle_ping(pc)
-                else:
-                    print("ping while not running")
             elif header.command == packet.RUDP_CMD_PONG:
                 if self.state == 'run':
                     self.handle_pong(pc)
-                else:
-                    print("pong while not running")
             elif header.command >= packet.RUDP_CMD_APP:
                 # user command, transmit the packet
                 self.handler.handle_packet(self, pc)
@@ -234,7 +230,6 @@ class peer(object):
         self.scheduled = True
 
     def ping(self):
-        print("ping")
         pc = packet.packet_data()
         pc.header.command = packet.RUDP_CMD_PING
         pc.data = pack('!Q', rudp_timestamp())

@@ -1,8 +1,10 @@
 from struct import pack, unpack
-from rudp.client import client, client_handler
-from rudp.packet import RUDP_CMD_APP
-from log import warning, info
 from time import sleep
+
+from frozax.log import warning, info
+
+from .rudp.client import client, client_handler
+from .rudp.packet import RUDP_CMD_APP
 
 
 FOILS_HID_DEVICE_NEW = 0
@@ -133,10 +135,13 @@ class rudp_hid_client(object):
         header = pack('!IB{}s'.format(len(data)), device_id, report_id, data)
         self.base.send(reliable, FOILS_HID_FEATURE, header)
 
+    def send_key(self, key):
+        self.send_command(1, bytes(key, "utf-8")[0])
+
     # size of code is number of bits of the code (8, 16, 32)
     def send_command(self, report, code, size_of_code=32):
         header = foils_hid_header(0, report)
-        pack_format = '!I'
+        pack_format = '<I'
         if size_of_code == 16:
             pack_format = '<H'
         elif size_of_code == 8:
@@ -144,8 +149,6 @@ class rudp_hid_client(object):
 
         data = header.raw() + pack(pack_format, code)
         self.base.send(1, FOILS_HID_DATA, data)
-
-        sleep(0.01)
 
         # send empty command too
         data = header.raw() + pack(pack_format, 0)

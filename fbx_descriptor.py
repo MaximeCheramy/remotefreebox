@@ -1,5 +1,5 @@
-from rudp_hid_client import foils_hid_device_descriptor
-from log import error
+from .rudp_hid_client import foils_hid_device_descriptor
+from frozax.log import error
 
 
 unicode_report_descriptor = bytes([
@@ -160,5 +160,4 @@ def fbx_get_command(command_text):
             size_of_code = 8
         return target, code, size_of_code
     else:
-        error("Unknown command %s" % command_text)
-        return None, None
+        return TARGET_UNICODE, ord(command_text)

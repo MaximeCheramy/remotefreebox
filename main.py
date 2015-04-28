@@ -11,6 +11,8 @@ from rudp_hid_client import rudp_hid_client
 from fbx_descriptor import fbx_foils_hid_device_descriptor, fbx_get_command
 from log import success, info
 
+assert sys.version_info.major >= 3, "Needs at least Python 3"
+
 def handle_packet(cl, cmd, data):
     info("handle packet main.py (%s %s %s)" % (cl, cmd, data))
 
@@ -26,8 +28,6 @@ def connected(cl):
 def server_lost(cl):
     info("server_lost %s" % cl)
 
-
-assert sys.version_info.major >= 3, "Needs at least Python 3"
 
 # find freebox
 freebox = detect()
@@ -56,3 +56,15 @@ while True:
     elif ch == '-':
         info("Sending -")
         c.send_command(*fbx_get_command("Vol-"))
+    elif ch == 'a':
+        info("Sending Enter")
+        c.send_command(*fbx_get_command("Enter"))
+    elif ch == 'z':
+        info("Sending subtitle track")
+        c.send_command(*fbx_get_command("Subtitle Track"))
+    elif ch == 'e':
+        info("Sending system wakeup")
+        c.send_command(*fbx_get_command("System Wakeup"))
+    elif ch in [str(a) for a in range(10)]:
+        info("sending %s" % ch)
+        c.send_key(ch)
