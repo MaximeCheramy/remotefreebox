@@ -10,5 +10,7 @@ The documentation of the protocol is available here: http://dev.freebox.fr/sdk/
 Use the class FreeboxController, that automatically look for the network for a freebox.
 Then, use the press method to simulate a key press.
 
+    from remotefreebox.freeboxcontroller import FreeboxController
+
     fbx = FreeboxController()
-    fbx.press("Chan +")
+    fbx.press("Chan+")

@@ -1,5 +1,6 @@
 #/usr/bin/python3
 
+import sys
 from threading import Thread
 
 from .detectserver import detect
@@ -9,7 +10,13 @@ from .rudp.rudp import rudp
 from .rudp_hid_client import rudp_hid_client
 from .fbx_descriptor import fbx_foils_hid_device_descriptor, fbx_get_command
 
-from frozax.log import success, info
+
+def info(s):
+    print(s, file=sys.stderr)
+
+def success(s):
+    print(s, file=sys.stderr)
+
 
 class FreeboxController(object):
     def __init__(self):

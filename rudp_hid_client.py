@@ -1,7 +1,6 @@
 from struct import pack, unpack
 from time import sleep
-
-from frozax.log import warning, info
+import sys
 
 from .rudp.client import client, client_handler
 from .rudp.packet import RUDP_CMD_APP
@@ -16,6 +15,10 @@ FOILS_HID_DATA = 5
 FOILS_HID_GRAB = 6
 FOILS_HID_RELEASE = 7
 FOILS_HID_FEATURE_SOLLICIT = 8
+
+
+def info(s):
+    print(s, file=sys.stderr)
 
 
 def round_up(x):

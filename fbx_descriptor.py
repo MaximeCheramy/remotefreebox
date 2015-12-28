@@ -1,5 +1,4 @@
 from .rudp_hid_client import foils_hid_device_descriptor
-from frozax.log import error
 
 
 unicode_report_descriptor = bytes([
