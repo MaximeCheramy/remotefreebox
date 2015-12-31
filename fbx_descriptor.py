@@ -149,6 +149,7 @@ fbx_target_command_codes = {
     "Chan-": (TARGET_CONSUMER, HID_CONSUMER_CHANNEL_DECREMENT)
 }
 
+
 def fbx_get_command(command_text):
     if command_text in fbx_target_command_codes:
         target, code = fbx_target_command_codes[command_text]
@@ -159,4 +160,4 @@ def fbx_get_command(command_text):
             size_of_code = 8
         return target, code, size_of_code
     else:
-        return TARGET_UNICODE, ord(command_text)
+        raise Exception("Unknown command.")

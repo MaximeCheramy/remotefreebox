@@ -52,3 +52,7 @@ class FreeboxController(object):
     def press(self, key):
         info("pressing %s" % key)
         self.client.send_command(*fbx_get_command(key))
+
+    def write(self, text):
+        for l in text:
+            self.client.send_command(1, ord(l))
