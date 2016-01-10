@@ -19,7 +19,7 @@ def success(s):
 
 
 class FreeboxController(object):
-    def __init__(self):
+    def __init__(self, connected_cb=None):
         # find freebox
         freebox = detect()
         success("%s found at %s:%s" % (freebox.name, freebox.address, freebox.port))
@@ -40,6 +40,8 @@ class FreeboxController(object):
 
         def connected(cl):
             info("connected %s" % cl)
+            if connected_cb:
+                connected_cb(cl)
 
         def server_lost(cl):
             info("server_lost %s" % cl)

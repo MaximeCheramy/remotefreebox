@@ -12,7 +12,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='remotefreebox',
-    version='0.3',
+    version='0.3.1',
 
     description='A Python module to control a Freebox v6 remotely',
     long_description=long_description,
